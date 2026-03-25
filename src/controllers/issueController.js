@@ -28,8 +28,9 @@ const issueController = {
       const [rows] = await pool.query(
         `SELECT a.*, u.first_name, u.last_name 
          FROM articles a
-         JOIN users u ON a.author_id = u.id
-         WHERE a.issue_id = ? AND a.status = 'published'
+         JOIN submissions s ON a.submission_id = s.id
+         JOIN users u ON s.author_id = u.id
+         WHERE a.issue_id = ?
          ORDER BY a.page_start ASC`,
         [req.params.id]
       );

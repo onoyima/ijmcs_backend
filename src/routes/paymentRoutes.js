@@ -5,5 +5,6 @@ const { authenticate } = require('../middleware/auth');
 
 router.post('/initialize', authenticate, paymentController.initialize);
 router.get('/verify/:reference', authenticate, paymentController.verify);
+router.post('/webhook', paymentController.webhook);
 
 module.exports = router;

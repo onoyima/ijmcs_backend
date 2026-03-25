@@ -15,7 +15,7 @@ const pool = mysql.createPool({
 });
 
 pool.getConnection()
-  .then(conn => { console.log('✅ MySQL connected'); conn.release(); })
+  .then(conn => { console.log('✅ IJMCS MySQL connected'); conn.release(); })
   .catch(err => { console.error('❌ MySQL connection failed:', err); });
 
 module.exports = pool;

@@ -9,9 +9,9 @@ const articleController = {
       const [rows] = await pool.query(
         `SELECT a.*, u.first_name, u.last_name 
          FROM articles a
-         JOIN users u ON a.author_id = u.id
-         WHERE (a.title LIKE ? OR a.abstract LIKE ? OR a.keywords LIKE ?) 
-         AND a.status = 'published'
+         JOIN submissions s ON a.submission_id = s.id
+         JOIN users u ON s.author_id = u.id
+         WHERE (a.title LIKE ? OR a.abstract LIKE ? OR a.keywords LIKE ?)
          ORDER BY a.published_at DESC`,
         [query, query, query]
       );
@@ -25,7 +25,8 @@ const articleController = {
       const [rows] = await pool.query(
         `SELECT a.*, u.first_name, u.last_name, i.volume, i.number, i.year, i.title as issue_title
          FROM articles a
-         JOIN users u ON a.author_id = u.id
+         JOIN submissions s ON a.submission_id = s.id
+         JOIN users u ON s.author_id = u.id
          LEFT JOIN issues i ON a.issue_id = i.id
          WHERE a.id = ?`,
         [req.params.id]

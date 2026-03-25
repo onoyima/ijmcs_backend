@@ -18,12 +18,12 @@ const reviewController = {
   // POST /api/reviews/:id/submit
   submitReview: async (req, res, next) => {
     try {
-      const { recommendation, comments_to_author, comments_to_editor } = req.body;
+      const { recommendation, comments_to_author, comments_to_editor, scores_json } = req.body;
       const [result] = await pool.query(
         `UPDATE reviews 
-         SET recommendation = ?, comments_to_author = ?, comments_to_editor = ?, status = 'completed', completed_at = NOW()
+         SET recommendation = ?, comments_to_author = ?, comments_to_editor = ?, scores_json = ?, status = 'completed', completed_at = NOW()
          WHERE id = ? AND reviewer_id = ?`,
-        [recommendation, comments_to_author, comments_to_editor, req.params.id, req.user.id]
+        [recommendation, comments_to_author, comments_to_editor, JSON.stringify(scores_json || {}), req.params.id, req.user.id]
       );
       
       if (result.affectedRows === 0) return res.status(404).json({ message: 'Review assignment not found' });
