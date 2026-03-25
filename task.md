@@ -1,0 +1,29 @@
+# IJMCS Implementation Task List
+
+- [ ] PHASE 1 — Foundation [/]
+    - [ ] Set up project structure (client/server)
+    - [ ] Initialize MySQL database + run schema.sql
+    - [ ] Backend: Initialize server, install dependencies, set up base configs (db.js, app.js, etc.)
+    - [ ] Frontend: Initialize Vite + React + TailwindCSS, set up base structure
+- [ ] PHASE 2 — Authentication
+    - [ ] Backend: Auth controllers, routes, and middleware
+    - [ ] Frontend: Login/Register pages, AuthContext, Axios instance
+- [ ] PHASE 3 — Public Pages
+    - [ ] Backend: Article, Issue, Announcement, Settings endpoints
+    - [ ] Frontend: All 18 public pages with API integration
+- [ ] PHASE 4 — Submission Workflow
+    - [ ] Backend: Submission controller, file upload, email service
+    - [ ] Frontend: Multi-step submission form, dashboards
+- [ ] PHASE 5 — Review Workflow
+    - [ ] Backend: Review controller, editor decisions
+    - [ ] Frontend: Editor/Reviewer dashboards
+- [ ] PHASE 6 — Production & Publishing
+    - [ ] Backend: Galley proofs, cron jobs, publishing logic
+    - [ ] Frontend: Issue/Production management
+- [ ] PHASE 7 — Payments
+    - [ ] Backend: Paystack/Flutterwave integration, webhooks
+    - [ ] Frontend: Payment page with provider popups/redirects
+- [ ] PHASE 8 — Admin & Polish
+    - [ ] Backend: Admin routes, system settings
+    - [ ] Frontend: Admin dashboard, user management, final polish
+    - [ ] Security audit and mobile responsiveness
