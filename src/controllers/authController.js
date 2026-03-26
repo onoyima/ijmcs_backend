@@ -141,6 +141,76 @@ const authController = {
       await pool.query('UPDATE users SET is_verified = 1, verify_token = NULL WHERE id = ?', [rows[0].id]);
       res.json({ message: 'Email verified successfully. You can now login.' });
     } catch (err) { next(err); }
+  },
+
+  // POST /api/auth/forgot-password
+  forgotPassword: async (req, res, next) => {
+    try {
+      const { email } = req.body;
+      const [users] = await pool.query('SELECT id, first_name, last_name FROM users WHERE email = ?', [email]);
+      
+      if (!users.length) {
+        // Return 200 to prevent email enumeration attacks
+        return res.json({ message: 'If an account exists, a reset link was sent.' });
+      }
+
+      const user = users[0];
+      const reset_token = crypto.randomBytes(32).toString('hex');
+      const reset_expires = new Date(Date.now() + 3600000); // 1 hour from now
+
+      await pool.query('UPDATE users SET reset_token = ?, reset_expires = ? WHERE id = ?', [reset_token, reset_expires, user.id]);
+
+      const resetLink = `${env.CLIENT_URL}/reset-password?token=${reset_token}`;
+      
+      const generateEmailTemplate = require('../utils/emailTemplate');
+      const emailHtml = generateEmailTemplate({
+        title: 'Reset Your Password',
+        recipientName: `${user.first_name} ${user.last_name}`,
+        bodyHtml: `
+          <p>We received a request to reset the password for your IJMCS account.</p>
+          <p>If you made this request, click the button below to set a new password. This link is only valid for 1 hour.</p>
+          <p>If you did not make this request, you can safely ignore this email.</p>
+        `,
+        buttonText: 'Reset Password',
+        buttonUrl: resetLink
+      });
+
+      const sendEmail = require('../utils/sendEmail');
+      await sendEmail({
+        to: email,
+        subject: 'IJMCS Password Reset Request',
+        html: emailHtml
+      });
+
+      console.log(`Password Reset Token for ${email}: ${reset_token}`);
+      res.json({ message: 'Password reset link sent to your email.' });
+    } catch (err) { next(err); }
+  },
+
+  // POST /api/auth/reset-password
+  resetPassword: async (req, res, next) => {
+    try {
+      const { token, newPassword } = req.body;
+      
+      if (!token || !newPassword) {
+        return res.status(400).json({ message: 'Invalid request' });
+      }
+
+      const [users] = await pool.query('SELECT id FROM users WHERE reset_token = ? AND reset_expires > NOW()', [token]);
+      
+      if (!users.length) {
+        return res.status(400).json({ message: 'Invalid or expired password reset token' });
+      }
+
+      const password_hash = await bcrypt.hash(newPassword, 12);
+
+      await pool.query('UPDATE users SET password_hash = ?, reset_token = NULL, reset_expires = NULL WHERE id = ?', [password_hash, users[0].id]);
+      
+      // Force logout from all active sessions securely by invalidating refresh tokens
+      await pool.query('DELETE FROM refresh_tokens WHERE user_id = ?', [users[0].id]);
+
+      res.json({ message: 'Password reset successfully. You can now log in.' });
+    } catch (err) { next(err); }
   }
 };
 
