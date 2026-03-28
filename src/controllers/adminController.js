@@ -1,4 +1,7 @@
 const pool = require('../config/db');
+const bcrypt = require('bcryptjs');
+const sendEmail = require('../utils/sendEmail');
+const generateEmailTemplate = require('../utils/emailTemplate');
 
 const adminController = {
   // GET /api/admin/stats
@@ -23,7 +26,7 @@ const adminController = {
   // GET /api/admin/users
   getAllUsers: async (req, res, next) => {
     try {
-      const [rows] = await pool.query('SELECT id, first_name, last_name, email, role, created_at FROM users ORDER BY created_at DESC');
+      const [rows] = await pool.query('SELECT id, first_name, last_name, email, role, is_verified, created_at FROM users ORDER BY created_at DESC');
       res.json(rows);
     } catch (err) { next(err); }
   },
@@ -116,6 +119,85 @@ const adminController = {
         [key, value, value]
       );
       res.json({ message: 'Settings updated' });
+    } catch (err) { next(err); }
+  },
+
+  // PATCH /api/admin/users/:id/verify
+  verifyUser: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      
+      const [user] = await pool.query('SELECT email, first_name FROM users WHERE id = ?', [id]);
+      if (!user.length) return res.status(404).json({ message: 'User not found' });
+
+      await pool.query('UPDATE users SET is_verified = 1, verify_token = NULL WHERE id = ?', [id]);
+
+      // Audit Log
+      await pool.query(
+        'INSERT INTO audit_logs (user_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user.id, 'MANUAL_VERIFY', 'user', id, `Manually verified account: ${user[0].email}`]
+      );
+
+      res.json({ message: 'User account manually verified' });
+    } catch (err) { next(err); }
+  },
+
+  // PATCH /api/admin/users/:id/update
+  updateUser: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { first_name, last_name, email, password } = req.body;
+
+      const [current] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
+      if (!current.length) return res.status(404).json({ message: 'User not found' });
+
+      let query = 'UPDATE users SET first_name = ?, last_name = ?, email = ?';
+      let params = [first_name, last_name, email];
+      let auditDetail = `Updated details for ${current[0].email}. `;
+
+      if (password && password.trim().length > 0) {
+        const hash = await bcrypt.hash(password, 12);
+        query += ', password_hash = ?';
+        params.push(hash);
+        auditDetail += 'Password was also reset. ';
+      }
+
+      query += ' WHERE id = ?';
+      params.push(id);
+
+      await pool.query(query, params);
+
+      // Audit Log
+      await pool.query(
+        'INSERT INTO audit_logs (user_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user.id, 'ADMIN_USER_EDIT', 'user', id, auditDetail]
+      );
+
+      // Notify User via Email
+      const emailHtml = generateEmailTemplate({
+        title: 'Account Information Updated',
+        recipientName: first_name,
+        bodyHtml: `
+          <p>An administrator has updated your account information on the IJMCS platform.</p>
+          <div style="background-color: #f1f5f9; padding: 20px; border-radius: 12px; margin: 20px 0;">
+            <ul style="margin: 0; padding: 0; list-style: none; font-size: 14px;">
+              <li style="margin-bottom: 8px;"><strong>Status:</strong> Successfully Updated</li>
+              <li style="margin-bottom: 8px;"><strong>Updated Field(s):</strong> Profile Details ${password ? '& Password' : ''}</li>
+            </ul>
+          </div>
+          <p>If you did not authorize these changes or have concerns regarding your account security, please contact the Editorial Office immediately.</p>
+        `,
+        buttonText: 'Login to Portal',
+        buttonUrl: `${process.env.CLIENT_URL || 'http://localhost:5173'}/login`
+      });
+
+      await sendEmail({
+        to: email,
+        subject: 'IJMCS Account Notification: Administrative Update',
+        html: emailHtml
+      });
+
+      res.json({ message: 'User details updated and notification sent' });
     } catch (err) { next(err); }
   }
 };

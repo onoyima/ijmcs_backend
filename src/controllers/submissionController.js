@@ -26,14 +26,16 @@ const submissionController = {
       const { id } = req.params;
       const author_id = req.user.id;
 
-      // Only allow editing if still a draft (pending_payment)
+      // Only allow editing if in draft (pending_payment) or requested for revision (revision_required)
       const [rows] = await pool.query(
         'SELECT status FROM submissions WHERE id = ? AND author_id = ?',
         [id, author_id]
       );
       if (!rows.length) return res.status(404).json({ message: 'Submission not found' });
-      if (rows[0].status !== 'pending_payment') {
-        return res.status(403).json({ message: 'Submission can no longer be edited at this stage.' });
+      
+      const allowedToEdit = ['pending_payment', 'revision_required'].includes(rows[0].status);
+      if (!allowedToEdit) {
+        return res.status(403).json({ message: 'Submission is currently locked for review and cannot be modified.' });
       }
 
       await pool.query(
@@ -88,7 +90,12 @@ const submissionController = {
   getMySubmissions: async (req, res, next) => {
     try {
       const [rows] = await pool.query(
-        'SELECT * FROM submissions WHERE author_id = ? ORDER BY created_at DESC',
+        `SELECT s.*, f.file_path, f.original_name as manuscript_name, p.reference as payment_reference 
+         FROM submissions s 
+         LEFT JOIN submission_files f ON s.id = f.submission_id AND f.file_type = 'manuscript'
+         LEFT JOIN payments p ON s.id = p.submission_id AND p.status = 'success'
+         WHERE s.author_id = ? 
+         ORDER BY s.created_at DESC`,
         [req.user.id]
       );
       res.json(rows);

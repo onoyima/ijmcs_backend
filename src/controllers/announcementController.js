@@ -8,10 +8,10 @@ const announcementController = {
       // Admin/Editor view: all (if we want to use the same controller for both)
       // I'll check if the request is from an admin/editor
       const user = req.user;
-      let query = 'SELECT id, title, body as content, is_published as is_public, created_at, updated_at FROM announcements WHERE is_published = 1 ORDER BY created_at DESC';
+      let query = 'SELECT id, title, body as content, image_url, type, is_published as is_public, created_at, updated_at FROM announcements WHERE is_published = 1 ORDER BY created_at DESC';
       
       if (user && (user.role === 'admin' || user.role === 'editor')) {
-        query = 'SELECT id, title, body as content, is_published as is_public, created_at, updated_at FROM announcements ORDER BY created_at DESC';
+        query = 'SELECT id, title, body as content, image_url, type, is_published as is_public, created_at, updated_at FROM announcements ORDER BY created_at DESC';
       }
 
       const [rows] = await pool.query(query);
@@ -22,10 +22,10 @@ const announcementController = {
   // POST /api/announcements (Protected)
   create: async (req, res, next) => {
     try {
-      const { title, content, is_public } = req.body;
+      const { title, content, is_public, image_url, type } = req.body;
       const [result] = await pool.query(
-        'INSERT INTO announcements (title, body, is_published, created_by) VALUES (?, ?, ?, ?)',
-        [title, content, is_public ? 1 : 0, req.user.id]
+        'INSERT INTO announcements (title, body, is_published, created_by, image_url, type) VALUES (?, ?, ?, ?, ?, ?)',
+        [title, content, is_public ? 1 : 0, req.user.id, image_url || null, type || 'general']
       );
 
       // Audit Log
@@ -42,11 +42,11 @@ const announcementController = {
   update: async (req, res, next) => {
     try {
       const { id } = req.params;
-      const { title, content, is_public } = req.body;
+      const { title, content, is_public, image_url, type } = req.body;
       
       await pool.query(
-        'UPDATE announcements SET title = ?, body = ?, is_published = ? WHERE id = ?',
-        [title, content, is_public ? 1 : 0, id]
+        'UPDATE announcements SET title = ?, body = ?, is_published = ?, image_url = ?, type = ? WHERE id = ?',
+        [title, content, is_public ? 1 : 0, image_url || null, type || 'general', id]
       );
 
       // Audit Log
@@ -83,7 +83,7 @@ const announcementController = {
   getOne: async (req, res, next) => {
     try {
       const [rows] = await pool.query(
-        'SELECT * FROM announcements WHERE id = ?',
+        'SELECT id, title, body as content, image_url, type, is_published as is_public, created_at, updated_at FROM announcements WHERE id = ?',
         [req.params.id]
       );
       if (!rows.length) return res.status(404).json({ message: 'Announcement not found' });

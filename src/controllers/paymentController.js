@@ -6,9 +6,7 @@ const paymentController = {
   initialize: async (req, res, next) => {
     try {
       const { submission_id, amount, email } = req.body;
-      const callbackUrl = process.env.FRONTEND_URL
-        ? `${process.env.FRONTEND_URL}/payment-callback`
-        : 'http://localhost:5173/payment-callback';
+      const callbackUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/payment/callback`;
       
       const response = await axios.post('https://api.paystack.co/transaction/initialize', {
         email,
@@ -37,7 +35,7 @@ const paymentController = {
       if (response.data.data.status === 'success') {
         const { submission_id } = response.data.data.metadata;
         await pool.query(
-          'INSERT IGNORE INTO payments (submission_id, amount, status, reference, user_id, provider) VALUES (?, ?, "completed", ?, ?, "paystack")',
+          'INSERT IGNORE INTO payments (submission_id, amount, status, reference, user_id, provider) VALUES (?, ?, "success", ?, ?, "paystack")',
           [submission_id, response.data.data.amount / 100, reference, req.user.id]
         );
         // UNLOCK FLOW: Set is_paid to 1 and change status to 'submitted' (or stay pending until upload)
@@ -69,7 +67,7 @@ const paymentController = {
           const author_id = submissions.length ? submissions[0].author_id : 0;
 
           await pool.query(
-            'INSERT INTO payments (submission_id, user_id, amount, provider, reference, status) VALUES (?, ?, ?, "paystack", ?, "completed") ON DUPLICATE KEY UPDATE status="completed"',
+            'INSERT INTO payments (submission_id, user_id, amount, provider, reference, status) VALUES (?, ?, ?, "paystack", ?, "success") ON DUPLICATE KEY UPDATE status="success"',
             [submission_id, author_id, amount / 100, reference]
           );
           

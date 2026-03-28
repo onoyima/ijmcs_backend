@@ -8,6 +8,8 @@ router.use(auth, requireRole('admin'));
 router.get('/stats',    adminController.getStats);
 router.get('/users',    adminController.getAllUsers);
 router.patch('/users/:id/role', adminController.updateUserRole);
+router.patch('/users/:id/verify', adminController.verifyUser);
+router.patch('/users/:id/update', adminController.updateUser);
 router.get('/payments', adminController.getPayments);
 router.get('/audit-logs', adminController.getAuditLogs);
 router.get('/contacts', adminController.getContacts);
