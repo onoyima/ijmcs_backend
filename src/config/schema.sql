@@ -294,6 +294,50 @@ INSERT INTO site_settings (setting_key, setting_value) VALUES
   ('bank_account_number', '');
 
 -- ============================================================
+-- DEFAULT ADMIN SEED USER
+-- Email: admin@ijmcs.ng  |  Password: Admin@ijmcs2024
+-- BCrypt hash of 'Admin@ijmcs2024' (10 rounds)
+-- Run this once on first setup. Change password immediately after first login.
+-- ============================================================
+INSERT IGNORE INTO users (first_name, last_name, email, password_hash, role, is_verified, is_active)
+VALUES (
+  'IJMCS',
+  'Administrator',
+  'admin@ijmcs.ng',
+  '$2b$10$v0UlDMkOaEi4.fISmO4a6.MBMnrjW/m3FxHGGHPYS7FjKYZG3VRPG',
+  'admin',
+  1,
+  1
+);
+
+-- ============================================================
+-- TABLE: audit_logs
+-- ============================================================
+CREATE TABLE audit_logs (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id       INT UNSIGNED NOT NULL,
+  action        VARCHAR(100) NOT NULL,
+  target_type   VARCHAR(50),
+  target_id     INT UNSIGNED,
+  details       TEXT,
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
+-- TABLE: contacts (Inbox/Messages)
+-- ============================================================
+CREATE TABLE contacts (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name          VARCHAR(255) NOT NULL,
+  email         VARCHAR(255) NOT NULL,
+  subject       VARCHAR(255),
+  message       TEXT NOT NULL,
+  status        ENUM('unread','read','archived') DEFAULT 'unread',
+  created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================
 -- TABLE: email_logs  (track sent emails)
 -- ============================================================
 CREATE TABLE email_logs (

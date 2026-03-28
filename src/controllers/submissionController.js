@@ -8,7 +8,7 @@ const submissionController = {
       const author_id = req.user.id;
       
       const [result] = await pool.query(
-        'INSERT INTO submissions (author_id, title, abstract, keywords, discipline, status) VALUES (?, ?, ?, ?, ?, "draft")',
+        'INSERT INTO submissions (author_id, title, abstract, keywords, discipline, status) VALUES (?, ?, ?, ?, ?, "pending_payment")',
         [author_id, title, abstract, keywords, discipline]
       );
       
@@ -19,11 +19,43 @@ const submissionController = {
     } catch (err) { next(err); }
   },
 
+  // PATCH /api/submissions/:id/draft — Update metadata while still in pending_payment
+  updateDraft: async (req, res, next) => {
+    try {
+      const { title, abstract, keywords, discipline } = req.body;
+      const { id } = req.params;
+      const author_id = req.user.id;
+
+      // Only allow editing if still a draft (pending_payment)
+      const [rows] = await pool.query(
+        'SELECT status FROM submissions WHERE id = ? AND author_id = ?',
+        [id, author_id]
+      );
+      if (!rows.length) return res.status(404).json({ message: 'Submission not found' });
+      if (rows[0].status !== 'pending_payment') {
+        return res.status(403).json({ message: 'Submission can no longer be edited at this stage.' });
+      }
+
+      await pool.query(
+        'UPDATE submissions SET title = ?, abstract = ?, keywords = ?, discipline = ?, updated_at = NOW() WHERE id = ? AND author_id = ?',
+        [title, abstract, keywords, discipline, id, author_id]
+      );
+
+      res.json({ message: 'Draft updated successfully' });
+    } catch (err) { next(err); }
+  },
+
   // POST /api/submissions/:id/upload
   uploadFile: async (req, res, next) => {
     try {
       if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
       
+      // NEW SECURITY GUARD: Verify payment Before allowing file upload
+      const [submission] = await pool.query('SELECT status, is_paid FROM submissions WHERE id = ?', [req.params.id]);
+      if (!submission.length || (!submission[0].is_paid && submission[0].status === 'pending_payment')) {
+        return res.status(403).json({ message: 'Payment of the APC is required before uploading the manuscript.' });
+      }
+
       const file_path = `/uploads/submissions/${req.file.filename}`;
       
       // Update the submission status to 'submitted'

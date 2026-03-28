@@ -39,7 +39,7 @@ const reviewController = {
         `SELECT s.*, u.first_name as author_first, u.last_name as author_last 
          FROM submissions s
          JOIN users u ON s.author_id = u.id
-         ORDER BY s.created_at DESC`
+         ORDER BY s.submitted_at DESC`
       );
       res.json(rows);
     } catch (err) { next(err); }

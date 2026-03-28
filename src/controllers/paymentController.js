@@ -6,11 +6,15 @@ const paymentController = {
   initialize: async (req, res, next) => {
     try {
       const { submission_id, amount, email } = req.body;
+      const callbackUrl = process.env.FRONTEND_URL
+        ? `${process.env.FRONTEND_URL}/payment-callback`
+        : 'http://localhost:5173/payment-callback';
       
       const response = await axios.post('https://api.paystack.co/transaction/initialize', {
         email,
         amount: amount * 100, // Paystack uses kobo
-        metadata: { submission_id }
+        callback_url: callbackUrl,
+        metadata: { submission_id, cancel_action: callbackUrl }
       }, {
         headers: {
           Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
@@ -36,8 +40,8 @@ const paymentController = {
           'INSERT IGNORE INTO payments (submission_id, amount, status, reference, user_id, provider) VALUES (?, ?, "completed", ?, ?, "paystack")',
           [submission_id, response.data.data.amount / 100, reference, req.user.id]
         );
-        // Update submission status to paid/processing
-        await pool.query('UPDATE submissions SET status = "in_production" WHERE id = ?', [submission_id]);
+        // UNLOCK FLOW: Set is_paid to 1 and change status to 'submitted' (or stay pending until upload)
+        await pool.query('UPDATE submissions SET is_paid = 1 WHERE id = ?', [submission_id]);
       }
       
       res.json(response.data);
@@ -69,7 +73,7 @@ const paymentController = {
             [submission_id, author_id, amount / 100, reference]
           );
           
-          await pool.query('UPDATE submissions SET status = "in_production" WHERE id = ?', [submission_id]);
+          await pool.query('UPDATE submissions SET is_paid = 1 WHERE id = ?', [submission_id]);
           console.log(`Webhook Processed: Payment verified for Submission ID: ${submission_id}`);
         }
       }

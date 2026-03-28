@@ -15,6 +15,7 @@ const submissionRoutes   = require('./routes/submissionRoutes');
 const reviewRoutes       = require('./routes/reviewRoutes');
 const paymentRoutes      = require('./routes/paymentRoutes');
 const adminRoutes        = require('./routes/adminRoutes');
+const userRoutes        = require('./routes/userRoutes');
 
 const app = express();
 
@@ -49,6 +50,7 @@ app.use('/api/submissions',   submissionRoutes);
 app.use('/api/reviews',       reviewRoutes);
 app.use('/api/payments',      paymentRoutes);
 app.use('/api/admin',         adminRoutes);
+app.use('/api/users',         userRoutes);
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date() }));
 
 // ─── Global Error Handler ────────────────────────────────────

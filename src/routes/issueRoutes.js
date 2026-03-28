@@ -8,7 +8,7 @@ router.get('/:id/articles',     issueController.getArticles);
 
 // Editor Routes
 const { authenticate, requireRole } = require('../middleware/auth');
-router.post('/',              authenticate, requireRole(['editor']), issueController.createIssue);
-router.post('/:id/publish',   authenticate, requireRole(['editor']), issueController.publishIssue);
+router.post('/',              authenticate, requireRole('editor'), issueController.createIssue);
+router.post('/:id/publish',   authenticate, requireRole('editor'), issueController.publishIssue);
 
 module.exports = router;
