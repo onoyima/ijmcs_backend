@@ -95,7 +95,7 @@ const submissionController = {
          LEFT JOIN submission_files f ON s.id = f.submission_id AND f.file_type = 'manuscript'
          LEFT JOIN payments p ON s.id = p.submission_id AND p.status = 'success'
          WHERE s.author_id = ? 
-         ORDER BY s.created_at DESC`,
+         ORDER BY s.submitted_at DESC`,
         [req.user.id]
       );
       res.json(rows);
