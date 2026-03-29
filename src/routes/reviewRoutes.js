@@ -11,9 +11,9 @@ router.get('/history',        requireRole('reviewer', 'editor'), reviewControlle
 router.post('/:id/submit',    requireRole('reviewer', 'editor'), reviewController.submitReview);
 
 // Editor Routes
-router.get('/editor/all',     requireRole('editor'),             reviewController.getAllForEditor);
-router.post('/editor/assign', requireRole('editor'),             reviewController.assignReviewer);
-router.get('/submission/:submissionId', requireRole('editor'),   reviewController.getSubmissionReviews);
+router.get('/editor/all',     requireRole('editor', 'admin'),             reviewController.getAllForEditor);
+router.post('/editor/assign', requireRole('editor', 'admin'),             reviewController.assignReviewer);
+router.get('/submission/:submissionId', requireRole('editor', 'admin'),   reviewController.getSubmissionReviews);
 router.get('/author/submission/:id', requireRole('author', 'editor', 'admin'), reviewController.getAuthorReviews);
 
 module.exports = router;

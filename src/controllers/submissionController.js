@@ -98,10 +98,12 @@ const submissionController = {
   getMySubmissions: async (req, res, next) => {
     try {
       const [rows] = await pool.query(
-        `SELECT s.*, f.file_path, f.original_name as manuscript_name, p.reference as payment_reference 
+        `SELECT s.*, f.file_path, f.original_name as manuscript_name, p.reference as payment_reference,
+                i.volume as issue_volume, i.issue_number as issue_number, i.title as issue_title, i.cover_image_url as issue_cover
          FROM submissions s 
          LEFT JOIN submission_files f ON s.id = f.submission_id AND f.file_type = 'manuscript'
          LEFT JOIN payments p ON s.id = p.submission_id AND p.status = 'success'
+         LEFT JOIN issues i ON s.issue_id = i.id
          WHERE s.author_id = ? 
          ORDER BY s.submitted_at DESC`,
         [req.user.id]
