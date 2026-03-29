@@ -6,10 +6,17 @@ const submissionController = {
     try {
       const { title, abstract, keywords, discipline } = req.body;
       const author_id = req.user.id;
+
+      // 1. Get the current active issue
+      const [activeSetting] = await pool.query("SELECT setting_value FROM site_settings WHERE setting_key = 'active_issue_id'");
+      if (!activeSetting.length || !activeSetting[0].setting_value) {
+        return res.status(403).json({ message: 'Submissions are currently closed. No active issue is accepting papers.' });
+      }
+      const activeIssueId = parseInt(activeSetting[0].setting_value, 10);
       
       const [result] = await pool.query(
-        'INSERT INTO submissions (author_id, title, abstract, keywords, discipline, status) VALUES (?, ?, ?, ?, ?, "pending_payment")',
-        [author_id, title, abstract, keywords, discipline]
+        'INSERT INTO submissions (author_id, issue_id, title, abstract, keywords, discipline, status) VALUES (?, ?, ?, ?, ?, ?, "pending_payment")',
+        [author_id, activeIssueId, title, abstract, keywords, discipline]
       );
       
       res.status(201).json({ 

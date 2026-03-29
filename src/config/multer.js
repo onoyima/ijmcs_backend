@@ -19,19 +19,19 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['.doc', '.docx', '.pdf'];
+  const allowedTypes = ['.docx', '.pdf'];
   const ext = path.extname(file.originalname).toLowerCase();
   if (allowedTypes.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only .doc, .docx, and .pdf are allowed.'), false);
+    cb(new Error('Invalid file type. Only .docx and .pdf manuscripts are accepted.'), false);
   }
 };
 
+// No file size limit — manuscripts can be large
 const upload = multer({
   storage: storage,
-  fileFilter: fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  fileFilter: fileFilter
 });
 
 module.exports = upload;

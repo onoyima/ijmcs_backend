@@ -142,7 +142,6 @@ const adminController = {
     } catch (err) { next(err); }
   },
 
-  // PATCH /api/admin/users/:id/update
   updateUser: async (req, res, next) => {
     try {
       const { id } = req.params;
@@ -167,13 +166,11 @@ const adminController = {
 
       await pool.query(query, params);
 
-      // Audit Log
       await pool.query(
         'INSERT INTO audit_logs (user_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
         [req.user.id, 'ADMIN_USER_EDIT', 'user', id, auditDetail]
       );
 
-      // Notify User via Email
       const emailHtml = generateEmailTemplate({
         title: 'Account Information Updated',
         recipientName: first_name,
@@ -191,13 +188,130 @@ const adminController = {
         buttonUrl: `${process.env.CLIENT_URL || 'http://localhost:5173'}/login`
       });
 
-      await sendEmail({
-        to: email,
-        subject: 'IJMCS Account Notification: Administrative Update',
-        html: emailHtml
-      });
+      await sendEmail({ to: email, subject: 'IJMCS Account Notification: Administrative Update', html: emailHtml });
 
       res.json({ message: 'User details updated and notification sent' });
+    } catch (err) { next(err); }
+  },
+
+  // ─── ISSUE / VOLUME MANAGEMENT ───────────────────────────────────────────
+
+  // GET /api/admin/issues — list all issues
+  getIssues: async (req, res, next) => {
+    try {
+      const [rows] = await pool.query(`
+        SELECT i.*, 
+          (SELECT COUNT(*) FROM submissions s WHERE s.issue_id = i.id) as submission_count,
+          (SELECT COUNT(*) FROM articles a WHERE a.issue_id = i.id) as article_count
+        FROM issues i ORDER BY i.volume DESC, i.issue_number DESC
+      `);
+      
+      const [setting] = await pool.query("SELECT setting_value FROM site_settings WHERE setting_key = 'active_issue_id'");
+      const activeIssueId = setting.length ? parseInt(setting[0].setting_value, 10) : null;
+      
+      const issuesWithActiveFlag = rows.map(issue => ({
+        ...issue,
+        is_active: issue.id === activeIssueId
+      }));
+
+      res.json(issuesWithActiveFlag);
+    } catch (err) { next(err); }
+  },
+
+  // POST /api/admin/issues — create new issue
+  createIssue: async (req, res, next) => {
+    try {
+      const { volume, issue_number, year, title, description, cover_image_url } = req.body;
+      if (!volume || !issue_number || !year) {
+        return res.status(400).json({ message: 'Volume, Issue Number, and Year are required.' });
+      }
+      const [result] = await pool.query(
+        'INSERT INTO issues (volume, issue_number, year, title, description, cover_image_url, published) VALUES (?, ?, ?, ?, ?, ?, 0)',
+        [volume, issue_number, year, title || null, description || null, cover_image_url || null]
+      );
+      await pool.query(
+        'INSERT INTO audit_logs (user_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user.id, 'CREATE_ISSUE', 'issue', result.insertId, `Created Vol.${volume} No.${issue_number} (${year})`]
+      );
+      res.status(201).json({ message: 'Issue created', id: result.insertId });
+    } catch (err) { next(err); }
+  },
+
+  // PATCH /api/admin/issues/:id — update issue details
+  updateIssue: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { volume, issue_number, year, title, description, cover_image_url } = req.body;
+      await pool.query(
+        'UPDATE issues SET volume = ?, issue_number = ?, year = ?, title = ?, description = ?, cover_image_url = ?, updated_at = NOW() WHERE id = ?',
+        [volume, issue_number, year, title || null, description || null, cover_image_url || null, id]
+      );
+      res.json({ message: 'Issue updated successfully' });
+    } catch (err) { next(err); }
+  },
+
+  // PATCH /api/admin/issues/:id/publish — toggle publish status
+  publishIssue: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { published } = req.body; // true or false
+      const publishedAt = published ? 'NOW()' : 'NULL';
+      await pool.query(
+        `UPDATE issues SET published = ?, published_at = ${published ? 'NOW()' : 'NULL'} WHERE id = ?`,
+        [published ? 1 : 0, id]
+      );
+      await pool.query(
+        'INSERT INTO audit_logs (user_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user.id, published ? 'PUBLISH_ISSUE' : 'UNPUBLISH_ISSUE', 'issue', id, `Issue ${id} ${published ? 'published' : 'unpublished'}`]
+      );
+      res.json({ message: `Issue ${published ? 'published' : 'unpublished'} successfully` });
+    } catch (err) { next(err); }
+  },
+
+  // PATCH /api/admin/issues/:id/set-active — mark as the current active call-for-papers issue
+  setActiveIssue: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      // Deactivate all first, then set the target
+      await pool.query("UPDATE site_settings SET setting_value = ? WHERE setting_key = 'active_issue_id'", [id]);
+      // If the key doesn't exist yet, insert it
+      await pool.query(
+        "INSERT INTO site_settings (setting_key, setting_value) VALUES ('active_issue_id', ?) ON DUPLICATE KEY UPDATE setting_value = ?",
+        [id, id]
+      );
+      await pool.query(
+        'INSERT INTO audit_logs (user_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+        [req.user.id, 'SET_ACTIVE_ISSUE', 'issue', id, `Set Issue ${id} as the active submission target`]
+      );
+      res.json({ message: 'Active issue updated' });
+    } catch (err) { next(err); }
+  },
+
+  // DELETE /api/admin/issues/:id — only if no articles are linked
+  deleteIssue: async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const [articles] = await pool.query('SELECT COUNT(*) as count FROM articles WHERE issue_id = ?', [id]);
+      if (articles[0].count > 0) {
+        return res.status(400).json({ message: 'Cannot delete an issue that has published articles.' });
+      }
+      await pool.query('DELETE FROM issues WHERE id = ?', [id]);
+      res.json({ message: 'Issue deleted' });
+    } catch (err) { next(err); }
+  },
+
+  // GET /api/admin/submissions — all submissions with author info
+  getAllSubmissions: async (req, res, next) => {
+    try {
+      const [rows] = await pool.query(`
+        SELECT s.*, u.first_name, u.last_name, u.email as author_email,
+          f.file_path, f.original_name as manuscript_name
+        FROM submissions s
+        JOIN users u ON s.author_id = u.id
+        LEFT JOIN submission_files f ON s.id = f.submission_id AND f.file_type = 'manuscript'
+        ORDER BY s.submitted_at DESC
+      `);
+      res.json(rows);
     } catch (err) { next(err); }
   }
 };

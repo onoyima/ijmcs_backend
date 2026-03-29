@@ -16,4 +16,15 @@ router.get('/contacts', adminController.getContacts);
 router.patch('/settings/:key', adminController.updateGlobalSetting);
 router.patch('/settings', adminController.updateSettings);
 
+// Issues
+router.get('/issues', adminController.getIssues);
+router.post('/issues', adminController.createIssue);
+router.patch('/issues/:id', adminController.updateIssue);
+router.patch('/issues/:id/publish', adminController.publishIssue);
+router.patch('/issues/:id/set-active', adminController.setActiveIssue);
+router.delete('/issues/:id', adminController.deleteIssue);
+
+// Submissions (Admin view)
+router.get('/submissions', adminController.getAllSubmissions);
+
 module.exports = router;
