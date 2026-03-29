@@ -4,11 +4,19 @@ const env  = require('../config/env');
 
 const authenticate = async (req, res, next) => {
   try {
+    let token;
+    
+    // Check Authorization header first
     const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer '))
-      return res.status(401).json({ message: 'Access token required' });
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    } else if (req.query.token) {
+      // Fallback to query parameter (e.g. for receipt PDF downloads)
+      token = req.query.token;
+    }
 
-    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ message: 'Access token required' });
+
     const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET);
 
     const [rows] = await pool.query(

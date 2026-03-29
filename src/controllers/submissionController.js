@@ -26,21 +26,21 @@ const submissionController = {
     } catch (err) { next(err); }
   },
 
-  // PATCH /api/submissions/:id/draft — Update metadata while still in pending_payment
+  // PATCH /api/submissions/:id/draft — Update metadata while still in pending_payment or submitted
   updateDraft: async (req, res, next) => {
     try {
       const { title, abstract, keywords, discipline } = req.body;
       const { id } = req.params;
       const author_id = req.user.id;
 
-      // Only allow editing if in draft (pending_payment) or requested for revision (revision_required)
+      // Allow editing if in draft (pending_payment), newly submitted (submitted), or requested for revision (revision_required)
       const [rows] = await pool.query(
         'SELECT status FROM submissions WHERE id = ? AND author_id = ?',
         [id, author_id]
       );
       if (!rows.length) return res.status(404).json({ message: 'Submission not found' });
       
-      const allowedToEdit = ['pending_payment', 'revision_required'].includes(rows[0].status);
+      const allowedToEdit = ['pending_payment', 'submitted', 'revision_required'].includes(rows[0].status);
       if (!allowedToEdit) {
         return res.status(403).json({ message: 'Submission is currently locked for review and cannot be modified.' });
       }
@@ -81,13 +81,14 @@ const submissionController = {
       
       // MOCK EXTERNAL SYSTEM: Turnitin / iThenticate Plagiarism Check
       const submissionId = req.params.id;
-      setTimeout(async () => {
+      // Fire and forget, no delay
+      (async () => {
         try {
            const mockScore = Math.floor(Math.random() * 15) + 5; // Simulates 5% to 20% similarity
            await pool.query('UPDATE submissions SET similarity_score = ? WHERE id = ?', [mockScore, submissionId]);
            console.log(`[Turnitin Webhook Mock] Submission ${submissionId} Scanned. Similarity: ${mockScore}%`);
         } catch(e) {}
-      }, 5000); // 5 second mock processing delay
+      })();
       
       res.json({ message: 'File uploaded and submission finalized', file_path });
     } catch (err) { next(err); }
