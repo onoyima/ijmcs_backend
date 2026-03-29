@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const sendEmail = require('../utils/sendEmail');
 const generateEmailTemplate = require('../utils/emailTemplate');
+const axios = require('axios');
 
 const adminController = {
   // GET /api/admin/stats
@@ -140,6 +141,51 @@ const adminController = {
 
       res.json({ message: 'User account manually verified' });
     } catch (err) { next(err); }
+  },
+
+  // POST /api/admin/payments/verify/:reference
+  verifyPaymentAdmin: async (req, res, next) => {
+    try {
+      const { reference } = req.params;
+      const response = await axios.get(`https://api.paystack.co/transaction/verify/${reference}`, {
+        headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` }
+      });
+      
+      if (response.data.data.status === 'success') {
+        const { submission_id } = response.data.data.metadata || {};
+        const amount = response.data.data.amount / 100;
+
+        if (!submission_id) return res.status(400).json({ message: 'Payment verified but no submission ID found attached to it.' });
+
+        // Retrieve Author
+        const [submissions] = await pool.query('SELECT author_id FROM submissions WHERE id = ?', [submission_id]);
+        if (!submissions.length) return res.status(404).json({ message: 'Associated submission not found' });
+        
+        await pool.query(
+          'INSERT IGNORE INTO payments (submission_id, amount, status, reference, user_id, provider) VALUES (?, ?, "success", ?, ?, "paystack")',
+          [submission_id, amount, reference, submissions[0].author_id]
+        );
+        
+        // UNLOCK FLOW
+        await pool.query('UPDATE submissions SET is_paid = 1 WHERE id = ?', [submission_id]);
+
+        // Audit Log
+        await pool.query(
+          'INSERT INTO audit_logs (user_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)',
+          [req.user.id, 'PAYMENT_VERIFY', 'payment', submission_id, `Manually synced Paystack reference: ${reference} for amount $${amount}`]
+        );
+        
+        return res.json({ message: 'Payment successfully synchronized and verified', data: response.data.data });
+      }
+      
+      res.status(400).json({ message: `Payment status is ${response.data.data.status}`, data: response.data.data });
+    } catch (err) { 
+      // Handle axios Paystack errors smoothly
+      if (err.response?.data?.message) {
+         return res.status(400).json({ message: `Paystack Error: ${err.response.data.message}` });
+      }
+      next(err); 
+    }
   },
 
   updateUser: async (req, res, next) => {

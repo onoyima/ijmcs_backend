@@ -36,10 +36,13 @@ const reviewController = {
   getAllForEditor: async (req, res, next) => {
     try {
       const [rows] = await pool.query(
-        `SELECT s.*, u.first_name as author_first, u.last_name as author_last, f.file_path, f.original_name as manuscript_name
+        `SELECT s.*, u.first_name as author_first, u.last_name as author_last, 
+                f.file_path, f.original_name as manuscript_name,
+                i.volume as issue_volume, i.issue_number as issue_number
          FROM submissions s
          JOIN users u ON s.author_id = u.id
          LEFT JOIN submission_files f ON s.id = f.submission_id AND f.file_type = 'manuscript'
+         LEFT JOIN issues i ON s.issue_id = i.id
          ORDER BY s.submitted_at DESC`
       );
       res.json(rows);

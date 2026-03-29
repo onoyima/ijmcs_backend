@@ -11,6 +11,7 @@ router.patch('/users/:id/role', adminController.updateUserRole);
 router.patch('/users/:id/verify', adminController.verifyUser);
 router.patch('/users/:id/update', adminController.updateUser);
 router.get('/payments', adminController.getPayments);
+router.post('/payments/verify/:reference', adminController.verifyPaymentAdmin);
 router.get('/audit-logs', adminController.getAuditLogs);
 router.get('/contacts', adminController.getContacts);
 router.patch('/settings/:key', adminController.updateGlobalSetting);
